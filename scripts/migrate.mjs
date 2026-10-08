@@ -1,12 +1,20 @@
 import { Pool } from "pg";
 import { readdir, readFile } from "node:fs/promises";
-if (!process.env.DATABASE_URL)
-  throw new Error("Set DATABASE_URL before applying migrations");
+import {
+  assertDatabaseConfigured,
+  databaseErrorMessage,
+  databaseErrorCode,
+} from "../lib/database-errors.ts";
+assertDatabaseConfigured(process.env.DATABASE_URL);
+assertDatabaseConfigured(process.env.DIRECT_URL || process.env.DATABASE_URL);
 const pool = new Pool({
   connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
+  connectionTimeoutMillis: 15000,
+  statement_timeout: 60000,
 });
-const client = await pool.connect();
+let client;
 try {
+  client = await pool.connect();
   await client.query("BEGIN");
   await client.query("SELECT pg_advisory_xact_lock(73901825)");
   await client.query(
@@ -36,9 +44,15 @@ try {
   await client.query("COMMIT");
   console.log("Database is up to date");
 } catch (error) {
-  await client.query("ROLLBACK");
-  throw error;
+  if (client) await client.query("ROLLBACK").catch(() => {});
+  console.error(
+    "Migration failed:",
+    databaseErrorMessage(error),
+    "Code:",
+    databaseErrorCode(error),
+  );
+  process.exitCode = 1;
 } finally {
-  client.release();
+  client?.release();
   await pool.end();
 }
