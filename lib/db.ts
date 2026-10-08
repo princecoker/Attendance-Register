@@ -21,6 +21,7 @@ export async function getSessions(
   week: number | undefined,
   date: string | undefined,
   page: number,
+  schoolId?: string,
 ) {
   assertDatabaseConfigured(process.env.DATABASE_URL);
   const conditions: string[] = [];
@@ -33,6 +34,10 @@ export async function getSessions(
     params.push(date);
     conditions.push(`s.date=$${params.length}`);
   }
+  if (schoolId) {
+    params.push(schoolId);
+    conditions.push(`s.school_id=$${params.length}`);
+  }
   const where = conditions.length ? " WHERE " + conditions.join(" AND ") : "";
   const total = await pool.query(
     "SELECT count(*)::int AS total FROM sessions s" + where,
@@ -41,7 +46,7 @@ export async function getSessions(
   const sessions = await pool.query(
     sessionSelect +
       where +
-      ` ORDER BY s.date DESC,s.arrival_time DESC,s.created_at DESC LIMIT 50 OFFSET $${params.length + 1}`,
+      ` ORDER BY s.date DESC,s.arrival_time DESC,s.created_at DESC,s.id DESC LIMIT 50 OFFSET $${params.length + 1}`,
     [...params, (page - 1) * 50],
   );
   const today = new Intl.DateTimeFormat("en-CA", {
@@ -50,7 +55,7 @@ export async function getSessions(
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  const [counts, sessionCount, todaySessions] = await Promise.all([
+  const [counts, sessionCount, todaySessions, schools] = await Promise.all([
     pool.query(
       "SELECT status, count(*)::int AS count FROM attendance GROUP BY status",
     ),
@@ -58,8 +63,10 @@ export async function getSessions(
     pool.query(sessionSelect + " WHERE s.date=$1 ORDER BY s.arrival_time", [
       today,
     ]),
+    pool.query("SELECT id,name FROM schools ORDER BY name,id"),
   ]);
   return {
+    schools: schools.rows,
     sessions: sessions.rows,
     total: total.rows[0].total,
     page,

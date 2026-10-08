@@ -40,7 +40,7 @@ flowchart LR
     E --> F[Schools / Participants / Sessions / Attendance]
 ```
 
-The dashboard shows today's sessions in **Africa/Lagos**, global attendance statistics, and recent records. Log Session captures curriculum and participant statuses. History supports date/week filters, pagination, full topic and participant details, and CSV export across all matching pages. Loading, empty, validation and database-error states are explicit; no invented sample attendance is displayed.
+The dashboard shows today's sessions in **Africa/Lagos**, global attendance statistics, and recent records. Log Session captures curriculum and participant statuses. History supports school/date/week filters, pagination, full topic and participant details, and PDF and CSV downloads across all matching pages. PDF reports include the selected school, filters, session and attendance totals, topics, participant statuses and times, and page numbers; an embedded licensed DejaVu font supports accented names. Loading, empty, validation and database-error states are explicit; no invented sample attendance is displayed.
 
 ## 2. Database schema
 
@@ -61,12 +61,12 @@ The migration runner [scripts/migrate.mjs](scripts/migrate.mjs) applies versione
 
 Core endpoints are in [app/api/sessions/route.ts](app/api/sessions/route.ts); SQL access is in [lib/db.ts](lib/db.ts), and input rules are in [lib/validation.ts](lib/validation.ts).
 
-| Method and path                                   | Behavior                                                                                                                    |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/auth`                                  | Sign in using `{ "password": "..." }`. Issues an eight-hour signed, HttpOnly, SameSite=Strict cookie, Secure in production. |
-| `POST /api/logout`                                | Delete the session cookie.                                                                                                  |
-| `POST /api/sessions`                              | Validate input and atomically save a school, participants, session and attendance; returns 201.                             |
-| `GET /api/sessions?week=2&date=2026-10-08&page=1` | Return matching sessions (50 per page), total, global statistics and today's sessions. Filters are optional.                |
+| Method and path                                                        | Behavior                                                                                                                                                                                               |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /api/auth`                                                       | Sign in using `{ "password": "..." }`. Issues an eight-hour signed, HttpOnly, SameSite=Strict cookie, Secure in production.                                                                            |
+| `POST /api/logout`                                                     | Delete the session cookie.                                                                                                                                                                             |
+| `POST /api/sessions`                                                   | Validate input and atomically save a school, participants, session and attendance; returns 201.                                                                                                        |
+| `GET /api/sessions?schoolId=SCHOOL_UUID&week=2&date=2026-10-08&page=1` | Return matching sessions (50 per page), total, global statistics and today's sessions. School, week and date filters are optional; the response includes the full school list for the filter dropdown. |
 
 All session endpoints require authentication. Mutations require a matching Origin and Host. Invalid input returns 400, missing authentication 401, rejected origins 403, and unavailable database 503. Database errors are not exposed to clients.
 
@@ -125,7 +125,7 @@ npm run start            # Start the production build
 npm run test:smoke       # In another terminal, against the running server
 ```
 
-The smoke test uses `.env` and a disposable local database, exercises authentication, origin checks, validation, all attendance statuses, persistence, filters, dashboard statistics, real-browser form submission, clock buttons, CSV download and mobile width. It creates uniquely named test-school records and deletes only those records in cleanup. By default it uses `/usr/bin/chromium`; use `CHROMIUM_PATH` for your installed browser. Browser screenshots are written under `/tmp`, never committed.
+The smoke test uses `.env` and a disposable local database, exercises authentication, origin checks, validation, all attendance statuses, persistence, filters, dashboard statistics, real-browser form submission, clock buttons, school isolation, multi-page PDF/CSV downloads and mobile width. It creates uniquely named test-school records and deletes only those records in cleanup. By default it uses `/usr/bin/chromium`; use `CHROMIUM_PATH` for your installed browser. `pdftotext` is required by the PDF export smoke test to check generated report contents. Browser screenshots are written under `/tmp`, never committed.
 
 ## GitHub and Vercel hosting
 

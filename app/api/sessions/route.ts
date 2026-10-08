@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { getSessions, createSession } from "@/lib/db";
 import { databaseErrorCode, databaseErrorMessage } from "@/lib/database-errors";
@@ -10,10 +11,12 @@ export async function GET(request: Request) {
   const p = new URL(request.url).searchParams;
   const week = p.get("week");
   const date = p.get("date");
+  const schoolId = p.get("schoolId");
   const page = Number(p.get("page") || 1);
   if (
     (week && (!/^\d+$/.test(week) || Number(week) < 1 || Number(week) > 53)) ||
     (date && !dateField.safeParse(date).success) ||
+    (schoolId && !z.string().uuid().safeParse(schoolId).success) ||
     !Number.isSafeInteger(page) ||
     page < 1 ||
     page > 1000000
@@ -25,6 +28,7 @@ export async function GET(request: Request) {
         week ? Number(week) : undefined,
         date || undefined,
         page,
+        schoolId || undefined,
       ),
       { headers: { "Cache-Control": "private, no-store" } },
     );

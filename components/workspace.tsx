@@ -16,22 +16,15 @@ import {
   CalendarDays,
 } from "lucide-react";
 import LogSession, { lagosDate } from "./log-session";
-type RecordRow = {
-  id: string;
-  date: string;
-  week: number;
-  arrivalTime: string;
-  departureTime: string | null;
-  topic: string;
-  school: { name: string };
-  attendance: {
-    status: string;
-    arrivalTime: string | null;
-    departureTime: string | null;
-    participant: { name: string };
-  }[];
-};
+import {
+  fetchReportSessions,
+  reportCsv,
+  reportFilename,
+  reportParams,
+  type ReportSession as RecordRow,
+} from "@/lib/reports";
 type Data = {
+  schools: { id: string; name: string }[];
   sessions: RecordRow[];
   total: number;
   pageSize: number;
@@ -57,47 +50,44 @@ function displayDate(date: string) {
 function count(s: RecordRow, status: string) {
   return s.attendance.filter((a) => a.status === status).length;
 }
-function csvCell(value: unknown) {
-  const s = String(value ?? "");
-  return (
-    '"' +
-    (/^[\s]*[=+@\-]|^[\t\r\n]/.test(s) ? "'" + s : s).replaceAll('"', '""') +
-    '"'
-  );
-}
 export default function Workspace() {
   const [tab, setTab] = useState("Dashboard");
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [schoolId, setSchoolId] = useState("");
   const [week, setWeek] = useState("");
   const [date, setDate] = useState("");
   const [page, setPage] = useState(1);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [selected, setSelected] = useState<RecordRow | null>(null);
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const p = new URLSearchParams({ page: String(page) });
-      if (week) p.set("week", week);
-      if (date) p.set("date", date);
-      const r = await fetch("/api/sessions?" + p);
-      if (r.status === 401) {
-        window.location.href = "/login";
-        return;
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError("");
+      try {
+        const p = reportParams({ schoolId, week, date }, page);
+        const r = await fetch("/api/sessions?" + p, { signal });
+        if (r.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+        setData(d);
+      } catch (e) {
+        if (!signal?.aborted)
+          setError(e instanceof Error ? e.message : "Could not load sessions");
+      } finally {
+        if (!signal?.aborted) setLoading(false);
       }
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      setData(d);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load sessions");
-    } finally {
-      setLoading(false);
-    }
-  }, [week, date, page]);
+    },
+    [schoolId, week, date, page],
+  );
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, [load]);
   const stats = data?.stats;
   const present =
@@ -139,67 +129,36 @@ export default function Workspace() {
   ];
   const records =
     tab === "Dashboard" ? data?.sessions.slice(0, 5) : data?.sessions;
-  async function exportCsv() {
-    setExporting(true);
+  async function exportReport(format: "csv" | "pdf") {
+    setExporting(format);
     setError("");
+    const filters = { schoolId, week, date };
+    const schoolName = data?.schools.find((s) => s.id === schoolId)?.name;
     try {
-      const rows: RecordRow[] = [];
-      let current = 1;
-      let totalRows = Infinity;
-      while (rows.length < totalRows) {
-        const p = new URLSearchParams({ page: String(current) });
-        if (week) p.set("week", week);
-        if (date) p.set("date", date);
-        const r = await fetch("/api/sessions?" + p);
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error);
-        rows.push(...d.sessions);
-        totalRows = d.total;
-        if (!d.sessions.length) break;
-        current++;
+      const rows = await fetchReportSessions(filters);
+      if (!rows.length)
+        throw new Error("No sessions match the selected filters.");
+      const filename = reportFilename(schoolName, filters, lagosDate());
+      if (format === "pdf") {
+        const { reportPdf } = await import("@/lib/report-pdf");
+        const pdf = await reportPdf(rows, schoolName, filters, lagosDate());
+        pdf.save(filename + ".pdf");
+      } else {
+        const url = URL.createObjectURL(
+          new Blob(["\uFEFF" + reportCsv(rows)], {
+            type: "text/csv;charset=utf-8;",
+          }),
+        );
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename + ".csv";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
-      const csv = [
-        [
-          "School",
-          "Date",
-          "Week",
-          "Session arrival",
-          "Session departure",
-          "Topic",
-          "Participant",
-          "Status",
-          "Participant arrival",
-          "Participant departure",
-        ],
-        ...rows.flatMap((s) =>
-          s.attendance.map((a) => [
-            s.school.name,
-            s.date.slice(0, 10),
-            s.week,
-            s.arrivalTime,
-            s.departureTime,
-            s.topic,
-            a.participant.name,
-            a.status,
-            a.arrivalTime,
-            a.departureTime,
-          ]),
-        ),
-      ]
-        .map((row) => row.map(csvCell).join(","))
-        .join("\r\n");
-      const url = URL.createObjectURL(
-        new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
-      );
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `attendance-${lagosDate()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed");
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }
   return (
@@ -232,6 +191,7 @@ export default function Workspace() {
               onClick={() => {
                 setTab(t.name);
                 setSelected(null);
+                setSchoolId("");
                 setWeek("");
                 setDate("");
                 setPage(1);
@@ -421,20 +381,52 @@ export default function Workspace() {
                       View all records →
                     </button>
                   ) : (
-                    <button
-                      className="secondary"
-                      disabled={
-                        exporting || loading || Boolean(error) || !data?.total
-                      }
-                      onClick={() => void exportCsv()}
-                    >
-                      <Download size={16} />
-                      {exporting ? "Exporting…" : "Export CSV"}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      {(["pdf", "csv"] as const).map((format) => (
+                        <button
+                          key={format}
+                          className="secondary"
+                          disabled={
+                            Boolean(exporting) ||
+                            loading ||
+                            Boolean(error) ||
+                            !data?.total
+                          }
+                          onClick={() => void exportReport(format)}
+                        >
+                          <Download size={16} />
+                          {exporting === format
+                            ? "Exporting " + format.toUpperCase() + "…"
+                            : "Export " + format.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
                 {tab !== "Dashboard" && (
                   <div className="p-5 flex flex-wrap gap-4 items-end bg-slate-50">
+                    <div className="w-full sm:w-72">
+                      <label htmlFor="filterSchool" className="label">
+                        Name of school
+                      </label>
+                      <select
+                        id="filterSchool"
+                        className="field"
+                        value={schoolId}
+                        onChange={(e) => {
+                          setSchoolId(e.target.value);
+                          setPage(1);
+                          setSelected(null);
+                        }}
+                      >
+                        <option value="">All schools</option>
+                        {data?.schools.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div>
                       <label htmlFor="filterWeek" className="label">
                         Academic week
@@ -474,6 +466,7 @@ export default function Workspace() {
                     <button
                       className="secondary"
                       onClick={() => {
+                        setSchoolId("");
                         setWeek("");
                         setDate("");
                         setPage(1);
