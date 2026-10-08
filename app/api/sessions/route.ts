@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessions, createSession } from "@/lib/db";
+import { databaseErrorCode, databaseErrorMessage } from "@/lib/database-errors";
 import { authenticated, sameOrigin } from "@/lib/auth";
 import { dateField, sessionSchema } from "@/lib/validation";
 export const runtime = "nodejs";
@@ -28,14 +29,10 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error(
-      "Session query failed",
-      error instanceof Error ? error.name : "unknown",
-    );
+    console.error("Session query failed", databaseErrorCode(error));
     return NextResponse.json(
       {
-        error:
-          "Database unavailable. Check the database configuration and migrations.",
+        error: databaseErrorMessage(error),
       },
       { status: 503 },
     );
@@ -66,14 +63,10 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(await createSession(parsed.data), { status: 201 });
   } catch (error) {
-    console.error(
-      "Session creation failed",
-      error instanceof Error ? error.name : "unknown",
-    );
+    console.error("Session creation failed", databaseErrorCode(error));
     return NextResponse.json(
       {
-        error:
-          "Could not save the session. Please check database availability and try again.",
+        error: databaseErrorMessage(error),
       },
       { status: 503 },
     );

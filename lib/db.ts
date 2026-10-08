@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { assertDatabaseConfigured } from "./database-errors";
 import type { SessionInput } from "./validation";
 const globalDb = globalThis as unknown as { pool?: Pool };
 export const pool =
@@ -21,6 +22,7 @@ export async function getSessions(
   date: string | undefined,
   page: number,
 ) {
+  assertDatabaseConfigured(process.env.DATABASE_URL);
   const conditions: string[] = [];
   const params: (string | number)[] = [];
   if (week) {
@@ -73,6 +75,7 @@ export async function getSessions(
   };
 }
 export async function createSession(v: SessionInput) {
+  assertDatabaseConfigured(process.env.DATABASE_URL);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
