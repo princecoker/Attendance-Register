@@ -1,0 +1,41 @@
+{
+  "name": "attendance-register",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "lint": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "db:deploy": "node scripts/migrate.mjs",
+    "test:smoke": "node --env-file=.env scripts/smoke.mjs",
+    "db:local": "node --env-file=.env scripts/local-db.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "next": "15.5.27",
+    "pg": "^8.23.1",
+    "react": "19.1.4",
+    "react-dom": "19.1.4",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.23",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "overrides": {
+    "postcss": "$postcss",
+    "sharp": "^0.35.6"
+  }
+}
