@@ -20,11 +20,11 @@ npm run dev
 
 Use the existing checkout in Codex cloud tasks; each task is isolated, so no extra Git worktree is needed. Node.js 22 or 24 is recommended; Node 24 was used to validate this application. Docker is only needed for the optional local database. Set the local `DATABASE_URL` and `DIRECT_URL` to your Docker PostgreSQL instance with database `attendance`, user `attendance`, and port `5432`. The local-db helper reads the password without printing it and passes it to Docker Compose.
 
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Runtime PostgreSQL connection URL. Use your provider's pooled URL on Vercel and its prescribed TLS parameters. |
-| `DIRECT_URL` | Direct PostgreSQL URL for migrations; falls back to `DATABASE_URL` when omitted. |
-| `ADMIN_PASSWORD` | A strong, unique shared administrator password. Never reuse the local development password in production. |
+| Variable         | Purpose                                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`   | Runtime PostgreSQL connection URL. Use your provider's pooled URL on Vercel and its prescribed TLS parameters.        |
+| `DIRECT_URL`     | Direct PostgreSQL URL for migrations; falls back to `DATABASE_URL` when omitted.                                      |
+| `ADMIN_PASSWORD` | A strong, unique shared administrator password. Never reuse the local development password in production.             |
 | `SESSION_SECRET` | A random secret of at least 32 characters for signing session cookies. Generate securely with `openssl rand -hex 32`. |
 
 Keep secrets in an ignored `.env` locally and in Vercel environment variables for deployment. Never commit credentials. The application fails closed when administrator authentication is unconfigured.
@@ -46,12 +46,12 @@ The dashboard shows today's sessions in **Africa/Lagos**, global attendance stat
 
 The complete executable schema is [database/migrations/001_initial.sql](database/migrations/001_initial.sql). Tables:
 
-| Model | Fields and relationships |
-| --- | --- |
-| `schools` | UUID `id`, unique `name` |
-| `participants` | UUID `id`, `school_id` → schools, `name`; unique name within each school |
-| `sessions` | UUID `id`, `school_id` → schools, `date` (DATE), `week` (1–53), `arrival_time` (TIME), optional `departure_time` (TIME), `topic` (TEXT), `created_at` |
-| `attendance` | UUID `id`, `session_id` → sessions, `participant_id` → participants, `status` (PRESENT / ABSENT / LATE), optional individual arrival/departure times; unique participant per session |
+| Model          | Fields and relationships                                                                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schools`      | UUID `id`, unique `name`                                                                                                                                                             |
+| `participants` | UUID `id`, `school_id` → schools, `name`; unique name within each school                                                                                                             |
+| `sessions`     | UUID `id`, `school_id` → schools, `date` (DATE), `week` (1–53), `arrival_time` (TIME), optional `departure_time` (TIME), `topic` (TEXT), `created_at`                                |
+| `attendance`   | UUID `id`, `session_id` → sessions, `participant_id` → participants, `status` (PRESENT / ABSENT / LATE), optional individual arrival/departure times; unique participant per session |
 
 Session times are local Lagos wall-clock times. A session starts and finishes on the same calendar day; overnight sessions are rejected. Missing departure means an open session. Absent participants cannot have times. Participant departure requires arrival. Attendance rate is `(present + late) / all attendance entries`; it measures session participation, not distinct people. The current identity model distinguishes participants by their school and exact name; institutions with duplicate names should add stable student identifiers in a follow-up.
 
@@ -61,12 +61,12 @@ The migration runner [scripts/migrate.mjs](scripts/migrate.mjs) applies versione
 
 Core endpoints are in [app/api/sessions/route.ts](app/api/sessions/route.ts); SQL access is in [lib/db.ts](lib/db.ts), and input rules are in [lib/validation.ts](lib/validation.ts).
 
-| Method and path | Behavior |
-| --- | --- |
-| `POST /api/auth` | Sign in using `{ "password": "..." }`. Issues an eight-hour signed, HttpOnly, SameSite=Strict cookie, Secure in production. |
-| `POST /api/logout` | Delete the session cookie. |
-| `POST /api/sessions` | Validate input and atomically save a school, participants, session and attendance; returns 201. |
-| `GET /api/sessions?week=2&date=2026-10-08&page=1` | Return matching sessions (50 per page), total, global statistics and today's sessions. Filters are optional. |
+| Method and path                                   | Behavior                                                                                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth`                                  | Sign in using `{ "password": "..." }`. Issues an eight-hour signed, HttpOnly, SameSite=Strict cookie, Secure in production. |
+| `POST /api/logout`                                | Delete the session cookie.                                                                                                  |
+| `POST /api/sessions`                              | Validate input and atomically save a school, participants, session and attendance; returns 201.                             |
+| `GET /api/sessions?week=2&date=2026-10-08&page=1` | Return matching sessions (50 per page), total, global statistics and today's sessions. Filters are optional.                |
 
 All session endpoints require authentication. Mutations require a matching Origin and Host. Invalid input returns 400, missing authentication 401, rejected origins 403, and unavailable database 503. Database errors are not exposed to clients.
 
@@ -81,8 +81,18 @@ Example session request:
   "departureTime": "11:00",
   "topic": "Fractions, decimals and practical exercises",
   "attendance": [
-    { "name": "Ada Coker", "status": "PRESENT", "arrivalTime": "09:00", "departureTime": "11:00" },
-    { "name": "Tunde Bello", "status": "LATE", "arrivalTime": "09:15", "departureTime": "11:00" },
+    {
+      "name": "Ada Coker",
+      "status": "PRESENT",
+      "arrivalTime": "09:00",
+      "departureTime": "11:00"
+    },
+    {
+      "name": "Tunde Bello",
+      "status": "LATE",
+      "arrivalTime": "09:15",
+      "departureTime": "11:00"
+    },
     { "name": "Bisi Ade", "status": "ABSENT" }
   ]
 }
@@ -97,9 +107,9 @@ The main form component is [components/log-session.tsx](components/log-session.t
 The full dashboard and reports interface is [components/workspace.tsx](components/workspace.tsx); theme and reusable UI classes are in [app/globals.css](app/globals.css). The form renders in the workspace as:
 
 ```tsx
-import LogSession from '@/components/log-session';
+import LogSession from "@/components/log-session";
 
-<LogSession onSaved={() => void reloadSessions()} />
+<LogSession onSaved={() => void reloadSessions()} />;
 ```
 
 The central workspace stays white; green provides primary actions, yellow highlights late attendance, red marks absence/errors, and blue accents statistics. Mobile navigation, stacked forms and scrollable reports support small screens.

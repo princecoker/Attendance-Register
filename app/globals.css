@@ -1,15 +1,27 @@
 @import "tailwindcss";
 @theme {
- --color-lagos-green: #087443;
- --color-lagos-yellow: #F4C542;
- --color-lagos-red: #C63838;
- --color-lagos-blue: #2466B0;
+  --color-lagos-green: #087443;
+  --color-lagos-yellow: #f4c542;
+  --color-lagos-red: #c63838;
+  --color-lagos-blue: #2466b0;
 }
-body { @apply bg-[#f5f7f6] text-slate-800 antialiased; }
+body {
+  @apply bg-[#f5f7f6] text-slate-800 antialiased;
+}
 @layer components {
-  .field { @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-lagos-green focus:ring-2 focus:ring-green-100; }
-  .label { @apply mb-2 block text-sm font-medium text-slate-700; }
-  .primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-lagos-green px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50; }
-  .secondary { @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50; }
-  .card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+  .field {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-lagos-green focus:ring-2 focus:ring-green-100;
+  }
+  .label {
+    @apply mb-2 block text-sm font-medium text-slate-700;
+  }
+  .primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-lagos-green px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50;
+  }
+  .secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50;
+  }
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
 }

@@ -1,48 +1,170 @@
-import assert from 'node:assert/strict';
-import { Pool } from 'pg';
-import { chromium } from '@playwright/test';
-const base=process.env.SMOKE_BASE_URL||'http://localhost:3000';
-const pool=new Pool({connectionString:process.env.DATABASE_URL});
-const school='Smoke test '+Date.now();
+import assert from "node:assert/strict";
+import { Pool } from "pg";
+import { chromium } from "@playwright/test";
+const base = process.env.SMOKE_BASE_URL || "http://localhost:3000";
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const school = "Smoke test " + Date.now();
 let browser;
 try {
- let r=await fetch(base+'/api/sessions');assert.equal(r.status,401);
- r=await fetch(base+'/api/auth',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({password:'wrong-password'})});assert.equal(r.status,401);
- r=await fetch(base+'/api/auth',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({password:process.env.ADMIN_PASSWORD})});assert.equal(r.status,200);
- const cookie=r.headers.get('set-cookie').split(';')[0];
- const headers={Origin:base,Cookie:cookie,'Content-Type':'application/json'};
- const baseline=await (await fetch(base+'/api/sessions',{headers})).json();
- const baselineEntries=baseline.stats.counts.reduce((n,c)=>n+c._count._all,0);
- r=await fetch(base+'/api/sessions',{method:'POST',headers:{...headers,Origin:'https://untrusted.example'},body:'{}'});assert.equal(r.status,403);
- const record={school,date:'2026-10-08',week:2,arrivalTime:'09:00',departureTime:'11:00',topic:'Fractions and decimals',attendance:[{name:'Test Present',status:'PRESENT',arrivalTime:'09:00',departureTime:'11:00'},{name:'Test Absent',status:'ABSENT'},{name:'Test Late',status:'LATE',arrivalTime:'09:10',departureTime:'11:00'}]};
- r=await fetch(base+'/api/sessions',{method:'POST',headers,body:JSON.stringify({...record,departureTime:'08:00'})});assert.equal(r.status,400);
- r=await fetch(base+'/api/sessions',{method:'POST',headers,body:JSON.stringify(record)});assert.equal(r.status,201);const created=await r.json();assert.equal(created.attendance.length,3);assert.equal(created.topic,record.topic);
- r=await fetch(base+'/api/sessions?week=2&date=2026-10-08',{headers});assert.equal(r.status,200);const result=await r.json();assert(result.sessions.some(s=>s.id===created.id));assert.equal(result.stats.counts.reduce((n,c)=>n+c._count._all,0),baselineEntries+3);
- r=await fetch(base+'/api/sessions?week=3&date=2026-10-08',{headers});assert.equal((await r.json()).sessions.length,0);
- r=await fetch(base+'/api/sessions?date=2026-02-30',{headers});assert.equal(r.status,400);
- console.log('PASS API: authentication, origin protection, validation, database persistence, statuses, statistics and filters');
- browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
- const page=await browser.newPage({viewport:{width:1440,height:1000}});
- const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(base+'/login');await page.getByLabel('Administrator password').fill(process.env.ADMIN_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();
- await page.getByRole('heading',{name:'Your classes, at a glance.'}).waitFor();
- await page.getByText(school,{exact:true}).first().waitFor();
- await page.screenshot({path:'/tmp/attendance-dashboard.png',fullPage:true});
- await page.getByRole('button',{name:'Log session',exact:true}).first().click();
- await page.getByLabel('Name of school').fill(school);await page.getByLabel('Topic taught').fill('Browser-tested session');await page.getByLabel('Participant 1', {exact:true}).fill('Browser participant');
- await page.getByRole('button',{name:'Clock in',exact:true}).click();
- assert.match(await page.locator('#arrival').inputValue(),/^\d{2}:\d{2}$/);
- await page.getByRole('button',{name:'Clock out',exact:true}).click();await page.getByRole('button',{name:'Save session',exact:true}).click();await page.getByText('Session and attendance saved successfully.').waitFor();
- await page.getByRole('button',{name:'History & reports',exact:true}).click();await page.getByLabel('Academic week',{exact:true}).selectOption('2');
- await page.getByText(record.topic,{exact:true}).waitFor();
- const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Export CSV'}).click();const download=await downloadPromise;assert.match(download.suggestedFilename(),/^attendance-/);
- await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Log session',exact:true}).first().click();await page.screenshot({path:'/tmp/attendance-mobile.png',fullPage:true});
- assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
- await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.getByRole('heading',{name:'Welcome back.'}).waitFor();
- assert.deepEqual(errors,[]);console.log('PASS browser: sign-in, dashboard, session form, clock buttons, saved attendance, history filters, CSV export, mobile layout and sign-out');
+  let r = await fetch(base + "/api/sessions");
+  assert.equal(r.status, 401);
+  r = await fetch(base + "/api/auth", {
+    method: "POST",
+    headers: { Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({ password: "wrong-password" }),
+  });
+  assert.equal(r.status, 401);
+  r = await fetch(base + "/api/auth", {
+    method: "POST",
+    headers: { Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({ password: process.env.ADMIN_PASSWORD }),
+  });
+  assert.equal(r.status, 200);
+  const cookie = r.headers.get("set-cookie").split(";")[0];
+  const headers = {
+    Origin: base,
+    Cookie: cookie,
+    "Content-Type": "application/json",
+  };
+  const baseline = await (
+    await fetch(base + "/api/sessions", { headers })
+  ).json();
+  const baselineEntries = baseline.stats.counts.reduce(
+    (n, c) => n + c._count._all,
+    0,
+  );
+  r = await fetch(base + "/api/sessions", {
+    method: "POST",
+    headers: { ...headers, Origin: "https://untrusted.example" },
+    body: "{}",
+  });
+  assert.equal(r.status, 403);
+  const record = {
+    school,
+    date: "2026-10-08",
+    week: 2,
+    arrivalTime: "09:00",
+    departureTime: "11:00",
+    topic: "Fractions and decimals",
+    attendance: [
+      {
+        name: "Test Present",
+        status: "PRESENT",
+        arrivalTime: "09:00",
+        departureTime: "11:00",
+      },
+      { name: "Test Absent", status: "ABSENT" },
+      {
+        name: "Test Late",
+        status: "LATE",
+        arrivalTime: "09:10",
+        departureTime: "11:00",
+      },
+    ],
+  };
+  r = await fetch(base + "/api/sessions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...record, departureTime: "08:00" }),
+  });
+  assert.equal(r.status, 400);
+  r = await fetch(base + "/api/sessions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(record),
+  });
+  assert.equal(r.status, 201);
+  const created = await r.json();
+  assert.equal(created.attendance.length, 3);
+  assert.equal(created.topic, record.topic);
+  r = await fetch(base + "/api/sessions?week=2&date=2026-10-08", { headers });
+  assert.equal(r.status, 200);
+  const result = await r.json();
+  assert(result.sessions.some((s) => s.id === created.id));
+  assert.equal(
+    result.stats.counts.reduce((n, c) => n + c._count._all, 0),
+    baselineEntries + 3,
+  );
+  r = await fetch(base + "/api/sessions?week=3&date=2026-10-08", { headers });
+  assert.equal((await r.json()).sessions.length, 0);
+  r = await fetch(base + "/api/sessions?date=2026-02-30", { headers });
+  assert.equal(r.status, 400);
+  console.log(
+    "PASS API: authentication, origin protection, validation, database persistence, statuses, statistics and filters",
+  );
+  browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+    headless: true,
+    args: ["--no-sandbox"],
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+  });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(base + "/login");
+  await page
+    .getByLabel("Administrator password")
+    .fill(process.env.ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Your classes, at a glance." })
+    .waitFor();
+  await page.getByText(school, { exact: true }).first().waitFor();
+  await page.screenshot({
+    path: "/tmp/attendance-dashboard.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Log session", exact: true })
+    .first()
+    .click();
+  await page.getByLabel("Name of school").fill(school);
+  await page.getByLabel("Topic taught").fill("Browser-tested session");
+  await page
+    .getByLabel("Participant 1", { exact: true })
+    .fill("Browser participant");
+  await page.getByRole("button", { name: "Clock in", exact: true }).click();
+  assert.match(await page.locator("#arrival").inputValue(), /^\d{2}:\d{2}$/);
+  await page.getByRole("button", { name: "Clock out", exact: true }).click();
+  await page.getByRole("button", { name: "Save session", exact: true }).click();
+  await page.getByText("Session and attendance saved successfully.").waitFor();
+  await page
+    .getByRole("button", { name: "History & reports", exact: true })
+    .click();
+  await page.getByLabel("Academic week", { exact: true }).selectOption("2");
+  await page.getByText(record.topic, { exact: true }).waitFor();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export CSV" }).click();
+  const download = await downloadPromise;
+  assert.match(download.suggestedFilename(), /^attendance-/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Log session", exact: true })
+    .first()
+    .click();
+  await page.screenshot({ path: "/tmp/attendance-mobile.png", fullPage: true });
+  assert(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  );
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("heading", { name: "Welcome back." }).waitFor();
+  assert.deepEqual(errors, []);
+  console.log(
+    "PASS browser: sign-in, dashboard, session form, clock buttons, saved attendance, history filters, CSV export, mobile layout and sign-out",
+  );
 } finally {
- if(browser)await browser.close();
- await pool.query('DELETE FROM sessions WHERE school_id IN (SELECT id FROM schools WHERE name=$1)',[school]);
- await pool.query('DELETE FROM participants WHERE school_id IN (SELECT id FROM schools WHERE name=$1)',[school]);
- await pool.query('DELETE FROM schools WHERE name=$1',[school]);await pool.end();
+  if (browser) await browser.close();
+  await pool.query(
+    "DELETE FROM sessions WHERE school_id IN (SELECT id FROM schools WHERE name=$1)",
+    [school],
+  );
+  await pool.query(
+    "DELETE FROM participants WHERE school_id IN (SELECT id FROM schools WHERE name=$1)",
+    [school],
+  );
+  await pool.query("DELETE FROM schools WHERE name=$1", [school]);
+  await pool.end();
 }
